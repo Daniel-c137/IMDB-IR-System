@@ -182,7 +182,6 @@ class IMDbCrawler:
                 for id in self.frontier:
                     self.dynamic_ids.append(id)
                     futures.append(executor.submit(self.crawl_page_info, id))
-            print('#Futures', len(futures))
             wait(futures)
             for e in self.dynamic_ids:
                 if e not in self.crawled:
@@ -316,37 +315,6 @@ class IMDbCrawler:
 def main():
     imdb_crawler = IMDbCrawler(crawling_threshold=1200)
     imdb_crawler.start_crawling()
-    # imdb_crawler.crawl_page_info('tt0172495')
-    # print(json.dumps(imdb_crawler.data, indent=1))
 
 if __name__ == '__main__':
     main()
-
-"""
-ERROR occurred during crawling. retrying...  tt8267604
-ERROR occurred during crawling. retrying...  tt0091251
-ERROR occurred during crawling. retrying...  tt0027977
-tt0071562
-tt0209144
-tt7286456
-tt0211915
-tt5027774
-ERROR occurred during crawling. retrying...  tt31378509
-ERROR occurred during crawling. retrying...  tt2788316
-ERROR occurred during crawling. retrying...  tt3344128
-ERROR occurred during crawling. retrying...  tt0142032
-ERROR occurred during crawling. retrying...  tt0084994
-ERROR occurred during crawling. retrying...  tt31378509
-ERROR occurred during crawling. retrying...  tt3344128
-ERROR occurred during crawling. retrying...  tt2788316
-ERROR occurred during crawling. retrying...  tt0142032
-ERROR occurred during crawling. retrying...  tt0084994
-ERROR occurred during crawling. retrying...  tt3344128
-ERROR occurred during crawling. retrying...  tt31378509
-ERROR occurred during crawling. retrying...  tt2788316
-ERROR occurred during crawling. retrying...  tt0142032
-ERROR occurred during crawling. retrying...  tt0084994
-ERROR occurred during crawling. retrying...  tt3344128
-ERROR occurred during crawling. retrying...  tt31378509
-ERROR occurred during crawling. retrying...  tt2788316
-"""
