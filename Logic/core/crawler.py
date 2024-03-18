@@ -1,19 +1,41 @@
 from requests import get
-from bs4 import BeautifulSoup
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, wait
 from threading import Lock
 import json
+import re
+import requests
+import threading
+	
+def synchronized(func):
+	
+    func.__lock__ = threading.Lock()
+		
+    def synced_func(*args, **kws):
+        with func.__lock__:
+            return func(*args, **kws)
 
+    return synced_func
 
 class IMDbCrawler:
     """
     put your own user agent in the headers
     """
     headers = {
-        'User-Agent': None
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
     }
     top_250_URL = 'https://www.imdb.com/chart/top/'
+    url_rg = r'https:\/\/www\.imdb\.com\/title\/(\w*)\/?'
+    content_reg = r'__NEXT_DATA__" type="application\/json">(.*"scriptLoader":\[\]})'
+    title_url = 'https://www.imdb.com/title/'
+    link_reg = r'<a href="(\/review\/\w+\/\?ref_=tt_urv)"\n>Permalink<\/a>'
+    map_reg = r'<script type="application\/ld\+json">({.*\n})<\/script>'
 
     def __init__(self, crawling_threshold=1000):
         """
@@ -25,51 +47,37 @@ class IMDbCrawler:
             The number of pages to crawl
         """
         # TODO
-        self.crawling_threshold = None
-        self.not_crawled = None
-        self.crawled = None
-        self.added_ids = None
-        self.add_list_lock = None
-        self.add_queue_lock = None
-
-    def get_id_from_URL(self, URL):
-        """
-        Get the id from the URL of the site. The id is what comes exactly after title.
-        for example the id for the movie https://www.imdb.com/title/tt0111161/?ref_=chttp_t_1 is tt0111161.
-
-        Parameters
-        ----------
-        URL: str
-            The URL of the site
-        Returns
-        ----------
-        str
-            The id of the site
-        """
-        # TODO
-        return URL.split('/')[4]
+        self.crawling_threshold = crawling_threshold
+        self.frontier = []
+        self.read_from_file_as_json()
+        self.dynamic_ids = self.crawled.copy()
 
     def write_to_file_as_json(self):
         """
         Save the crawled files into json
         """
-        # TODO
-        pass
+        with open('IMDB_crawled_ids.json', 'w+') as f:
+            f.write(json.dumps(self.crawled))
+            f.close()
+
+        with open('IMDB_not_crawled.json', 'w+') as f:
+            f.write(json.dumps(self.not_crawled))
+            f.close()
 
     def read_from_file_as_json(self):
         """
         Read the crawled files from json
         """
-        # TODO
-        with open('IMDB_crawled.json', 'r') as f:
-            self.crawled = None
+        with open('IMDB_crawled_ids.json', 'r') as f:
+            c = f.readline()
+            self.crawled = [] if c == '' else json.loads(c)
 
-        with open('IMDB_not_crawled.json', 'w') as f:
-            self.not_crawled = None
+        with open('IMDB_not_crawled.json', 'r') as f:
+            c = f.readline()
+            self.not_crawled = [] if c == '' else json.loads(c)
 
-        self.added_ids = None
 
-    def crawl(self, URL):
+    def crawl(self, url):
         """
         Make a get request to the URL and return the response
 
@@ -79,17 +87,48 @@ class IMDbCrawler:
             The URL of the site
         Returns
         ----------
-        requests.models.Response
+        str
             The response of the get request
         """
-        # TODO
-        return None
+        t = requests.get(url, headers=self.headers)
+        t.raise_for_status()
+        content = t.text
+
+        j =  {}
+        try:
+            response = re.search(self.content_reg, content).group(1)
+            j = json.loads(response)
+        except:
+            pass
+        links = re.findall(self.link_reg, content)
+        reviews = []
+        for l in links:
+            t1 = requests.get('https://www.imdb.com' + l)
+            t1.raise_for_status()
+            link_content = t1.text
+            r = json.loads(re.search(self.map_reg, link_content, re.U | re.DOTALL).group(1))
+            if 'reviewBody' not in r.keys():
+                ss = '<div class="text show-more__control">'
+                s = link_content.find(ss)
+                e = link_content.find('<div class="actions text-muted">')
+                r['reviewBody'] = link_content[s + len(ss):e].replace('</div>', '')
+            reviews.append(r)
+        j['reviews'] = reviews
+        return j
 
     def extract_top_250(self):
         """
         Extract the top 250 movies from the top 250 page and use them as seed for the crawler to start crawling.
         """
-        # TODO update self.not_crawled and self.added_ids
+        result = self.crawl(self.top_250_URL)['props']['pageProps']['pageData']['chartTitles']['edges']
+        res_str = []
+        for i in range(250):
+            id =  result[i]['node']['id']
+            if id not in self.crawled:
+                if id not in self.not_crawled:
+                    self.not_crawled.append(id)
+        self.write_to_file_as_json()
+
 
 
     def get_imdb_instance(self):
@@ -135,16 +174,36 @@ class IMDbCrawler:
         self.extract_top_250()
         futures = []
         crawled_counter = 0
-
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            while WHILE_LOOP_CONSTRAINTS:
-                URL = NEW_URL
-                futures.append(executor.submit(self.crawl_page_info, URL))
-                if THERE_IS_NOTHING_TO_CRAWL:
+        with ThreadPoolExecutor(20) as executor:
+            while self.crawling_threshold > len(self.dynamic_ids):
+                if (len(self.not_crawled) == 0):
                     wait(futures)
-                    futures = []
+                self.frontier = self.safe_subsequence()
+                for id in self.frontier:
+                    self.dynamic_ids.append(id)
+                    futures.append(executor.submit(self.crawl_page_info, id))
+            print('#Futures', len(futures))
+            wait(futures)
+            for e in self.dynamic_ids:
+                if e not in self.crawled:
+                    self.crawl_page_info(id)
+        self.write_data()
 
-    def crawl_page_info(self, URL):
+    batch_size = 20
+
+    def safe_subsequence(self):
+        res = []
+        for _ in range(self.batch_size):
+            try:
+                res.append(self.not_crawled.pop(0))
+            except:
+                return res
+        return res
+    
+    def get_url(self, id, suffix=''):
+        return self.title_url + id + suffix + '/'
+
+    def crawl_page_info(self, id):
         """
         Main Logic of the crawler. It crawls the page and extracts the information of the movie.
         Use related links of a movie to crawl more movies.
@@ -154,410 +213,140 @@ class IMDbCrawler:
         URL: str
             The URL of the site
         """
-        print("new iteration")
-        # TODO
-        pass
+        movie_url, review_url, summ_url = self.get_url(id), self.get_url(id, '/reviews'), self.get_url(id, '/plotsummary')
+        print("new iteration. crawling id:", id)
+        while True:
+            try:
+                movie = self.get_imdb_instance()
+                res = self.extract_movie_info(self.crawl(movie_url), movie)
+                if res == -1:
+                    print('restricted movie', id)
+                    return
+                self.extract_review_info(self.crawl(review_url), movie)
+                self.extract_summary_info(self.crawl(summ_url), movie)
+                break
+            except:
+                print('ERROR occurred during crawling. retrying... ', id)
+        # with open(f'data/data_{id}.json', 'w') as f:
+        #     f.write(json.dumps(movie, indent=1))
+        self.finalize_doc(movie)
+        print(f'doc {id} added to list')
+        return
+    
+    data = []
 
-    def extract_movie_info(self, res, movie, URL):
+    @synchronized
+    def finalize_doc(self, movie):
+        self.crawled.append(movie['id'])
+        for id in movie['related_links']:
+            if self.needs_crawl(id):
+                print('new id found!', id)
+                self.not_crawled.append(id)
+        self.data.append(movie)
+        if len(self.data) >= 0:
+            self.write_data()
+            
+        self.write_to_file_as_json()
+
+    def write_data(self):
+        print('writing to file...')
+        with open('IMDB_crawled.json', 'r') as f:
+                j = json.load(f)
+                j.extend(self.data)
+                f.close()
+        with open('IMDB_crawled.json', 'w') as f:
+            json.dump(j, f, indent=1)
+            f.close()
+        self.data.clear()
+    dynamic_ids = []
+    def needs_crawl(self, id):
+        return id not in self.dynamic_ids and id not in self.not_crawled
+
+
+    def extract_movie_info(self, res, movie):
         """
         Extract the information of the movie from the response and save it in the movie instance.
 
         Parameters
         ----------
-        res: requests.models.Response
-            The response of the get request
+        res: dict
+            The JSON response of the get request
         movie: dict
             The instance of the movie
         URL: str
             The URL of the site
         """
-        # TODO
-        movie['title'] = None
-        movie['first_page_summary'] = None
-        movie['release_year'] = None
-        movie['mpaa'] = None
-        movie['budget'] = None
-        movie['gross_worldwide'] = None
-        movie['directors'] = None
-        movie['writers'] = None
-        movie['stars'] = None
-        movie['related_links'] = None
-        movie['genres'] = None
-        movie['languages'] = None
-        movie['countries_of_origin'] = None
-        movie['rating'] = None
-        movie['summaries'] = None
-        movie['synopsis'] = None
-        movie['reviews'] = None
+        data = res['props']['pageProps']['aboveTheFoldData']
+        if data['productionStatus'] and data['productionStatus']['restriction'] and data['productionStatus']['restriction']['restrictionReason']:
+            return -1
+        main_data = res['props']['pageProps']['mainColumnData']
+        movie['id'] = res['props']['pageProps']['tconst']
+        movie['title'] = self.beautify(data['titleText']['text']) if data['titleText'] else ''
+        movie['first_page_summary'] = self.beautify(data['plot']['plotText']['plainText']) if data['plot'] and data['plot']['plotText'] else ''
+        movie['release_year'] = str(data['releaseYear']['year']) if data['releaseYear'] else ''
+        movie['mpaa'] = data['certificate']['rating'] if data['certificate'] else ""
+        movie['budget'] = str(main_data['productionBudget']['budget']['amount']) if main_data['productionBudget'] else ""
+        movie['gross_worldwide'] = str(main_data['worldwideGross']['total']['amount']) if main_data['worldwideGross'] else ''
+        movie['directors'] = [i['name']['nameText']['text'] for i in main_data['directors'][0]['credits']] if main_data['directors'] and len(main_data['directors']) > 0 else []
+        movie['writers'] = [i['name']['nameText']['text'] for i in main_data['writers'][0]['credits']] if main_data['writers'] and len(main_data['writers']) > 0 else []
+        movie['stars'] = [i['node']['name']['nameText']['text'] for i in main_data['cast']['edges']] if main_data['cast'] else []
+        movie['related_links'] = [i['node']['id']  for i in main_data['moreLikeThisTitles']['edges'] if i['node']['canHaveEpisodes'] == False] if main_data['moreLikeThisTitles'] else []
+        movie['genres'] = [i['text'] for i in data['genres']['genres']] if data['genres'] else []
+        movie['languages'] = [i['text'] for i in main_data['spokenLanguages']['spokenLanguages']] if main_data['spokenLanguages'] else []
+        movie['countries_of_origin'] = [i['text'] for i in main_data['countriesOfOrigin']['countries']] if main_data['countriesOfOrigin'] else []
+        movie['rating'] = str(data['ratingsSummary']['aggregateRating']) if data['ratingsSummary'] else ''
+        return 0
 
-    def get_summary_link(url):
-        """
-        Get the link to the summary page of the movie
-        Example:
-        https://www.imdb.com/title/tt0111161/ is the page
-        https://www.imdb.com/title/tt0111161/plotsummary is the summary page
+    def beautify(self, s):
+        return s.replace('\\u0027', "\u0027").replace('\\u0026', '\u0026').replace('\\u00ef', '\u00ef').replace('\\u00e9', '\u00e9').replace('\\u0096', '\u0096').replace('\\u00a8', '\u00a8').replace('&#39;', "'").replace('&#39;', "'").replace('<br/><br/>', '').replace('&quot;', '').replace('\n', '').replace('\\n', '').replace('\\u2013', '\u2013').replace('\\u00a0', '\u00a0').replace('\\u2014', '\u2014').replace('\\u00f3', '\u00f3')
 
-        Parameters
-        ----------
-        url: str
-            The URL of the site
-        Returns
-        ----------
-        str
-            The URL of the summary page
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get summary link")
+    def extract_review_info(self, response, movie):
+        movie['reviews'] = [[self.beautify(i['reviewBody'])] for i in response['reviews']]
 
-    def get_review_link(url):
-        """
-        Get the link to the review page of the movie
-        Example:
-        https://www.imdb.com/title/tt0111161/ is the page
-        https://www.imdb.com/title/tt0111161/reviews is the review page
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get review link")
+    def extract_summary_info(self, response, movie):
+        data = response['props']['pageProps']['contentData']['categories']
+        for e in data:
+            if e['id'] == 'summaries':
+                movie['summaries'] = [self.beautify(re.sub(r'<span style=.*$', '', i['htmlContent'])) for i in e['section']['items']]
 
-    def get_title(soup):
-        """
-        Get the title of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The title of the movie
-
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get title")
-
-    def get_first_page_summary(soup):
-        """
-        Get the first page summary of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The first page summary of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get first page summary")
-
-    def get_director(soup):
-        """
-        Get the directors of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The directors of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get director")
-
-    def get_stars(soup):
-        """
-        Get the stars of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The stars of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get stars")
-
-    def get_writers(soup):
-        """
-        Get the writers of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The writers of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get writers")
-
-    def get_related_links(soup):
-        """
-        Get the related links of the movie from the More like this section of the page from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The related links of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get related links")
-
-    def get_summary(soup):
-        """
-        Get the summary of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The summary of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get summary")
-
-    def get_synopsis(soup):
-        """
-        Get the synopsis of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The synopsis of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get synopsis")
-
-    def get_reviews_with_scores(soup):
-        """
-        Get the reviews of the movie from the soup
-        reviews structure: [[review,score]]
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[List[str]]
-            The reviews of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get reviews")
-
-    def get_genres(soup):
-        """
-        Get the genres of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The genres of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("Failed to get generes")
-
-    def get_rating(soup):
-        """
-        Get the rating of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The rating of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get rating")
-
-    def get_mpaa(soup):
-        """
-        Get the MPAA of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The MPAA of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get mpaa")
-
-    def get_release_year(soup):
-        """
-        Get the release year of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The release year of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get release year")
-
-    def get_languages(soup):
-        """
-        Get the languages of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The languages of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get languages")
-            return None
-
-    def get_countries_of_origin(soup):
-        """
-        Get the countries of origin of the movie from the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        List[str]
-            The countries of origin of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get countries of origin")
-
-    def get_budget(soup):
-        """
-        Get the budget of the movie from box office section of the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The budget of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get budget")
-
-    def get_gross_worldwide(soup):
-        """
-        Get the gross worldwide of the movie from box office section of the soup
-
-        Parameters
-        ----------
-        soup: BeautifulSoup
-            The soup of the page
-        Returns
-        ----------
-        str
-            The gross worldwide of the movie
-        """
-        try:
-            # TODO
-            pass
-        except:
-            print("failed to get gross worldwide")
+            elif e['id'] == 'synopsis':
+                movie['synopsis'] = [self.beautify(e['section']['items'][0]['htmlContent'])] if len(e['section']['items']) > 0 else ['']
 
 
 def main():
-    imdb_crawler = IMDbCrawler(crawling_threshold=600)
-    # imdb_crawler.read_from_file_as_json()
+    imdb_crawler = IMDbCrawler(crawling_threshold=1200)
     imdb_crawler.start_crawling()
-    imdb_crawler.write_to_file_as_json()
-
+    # imdb_crawler.crawl_page_info('tt0172495')
+    # print(json.dumps(imdb_crawler.data, indent=1))
 
 if __name__ == '__main__':
     main()
+
+"""
+ERROR occurred during crawling. retrying...  tt8267604
+ERROR occurred during crawling. retrying...  tt0091251
+ERROR occurred during crawling. retrying...  tt0027977
+tt0071562
+tt0209144
+tt7286456
+tt0211915
+tt5027774
+ERROR occurred during crawling. retrying...  tt31378509
+ERROR occurred during crawling. retrying...  tt2788316
+ERROR occurred during crawling. retrying...  tt3344128
+ERROR occurred during crawling. retrying...  tt0142032
+ERROR occurred during crawling. retrying...  tt0084994
+ERROR occurred during crawling. retrying...  tt31378509
+ERROR occurred during crawling. retrying...  tt3344128
+ERROR occurred during crawling. retrying...  tt2788316
+ERROR occurred during crawling. retrying...  tt0142032
+ERROR occurred during crawling. retrying...  tt0084994
+ERROR occurred during crawling. retrying...  tt3344128
+ERROR occurred during crawling. retrying...  tt31378509
+ERROR occurred during crawling. retrying...  tt2788316
+ERROR occurred during crawling. retrying...  tt0142032
+ERROR occurred during crawling. retrying...  tt0084994
+ERROR occurred during crawling. retrying...  tt3344128
+ERROR occurred during crawling. retrying...  tt31378509
+ERROR occurred during crawling. retrying...  tt2788316
+"""
