@@ -242,7 +242,7 @@ class IMDbCrawler:
                 print('new id found!', id)
                 self.not_crawled.append(id)
         self.data.append(movie)
-        if len(self.data) >= 0:
+        if len(self.data) >= 20:
             self.write_data()
             
         self.write_to_file_as_json()
