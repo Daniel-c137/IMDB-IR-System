@@ -254,7 +254,7 @@ class IMDbCrawler:
                 j.extend(self.data)
                 f.close()
         with open('IMDB_crawled.json', 'w') as f:
-            json.dump(j, f, indent=1)
+            json.dump(j, f, indent=1, ensure_ascii=False)
             f.close()
         self.data.clear()
     dynamic_ids = []
@@ -297,7 +297,8 @@ class IMDbCrawler:
         return 0
 
     def beautify(self, s):
-        return s.replace('\\u0027', "\u0027").replace('\\u0026', '\u0026').replace('\\u00ef', '\u00ef').replace('\\u00e9', '\u00e9').replace('\\u0096', '\u0096').replace('\\u00a8', '\u00a8').replace('&#39;', "'").replace('&#39;', "'").replace('<br/><br/>', '').replace('&quot;', '').replace('\n', '').replace('\\n', '').replace('\\u2013', '\u2013').replace('\\u00a0', '\u00a0').replace('\\u2014', '\u2014').replace('\\u00f3', '\u00f3')
+        text = re.sub(r'<a[^>]*>(.*?)<\/a>', r'\1', s)
+        return text.replace('&#39;', "'").replace('&#39;', "'").replace('&amp;', '&').replace('&gt;', '>').replace('&lt;', '<').replace('<br/><br/>', '').replace('&quot;', '').replace('\n', '').replace('\\n', '').replace('<ul>', '').replace('</ul>', '').replace('<li>', '').replace('</li>', '').replace('<u>', '').replace('</u>', '')
 
     def extract_review_info(self, response, movie):
         movie['reviews'] = [[self.beautify(i['reviewBody'])] for i in response['reviews']]
