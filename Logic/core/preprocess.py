@@ -58,12 +58,29 @@ class Preprocessor:
         for document in self.documents:
             self.apply_to_fields(document, self.prepreprocess)
             self.apply_to_fields(document, self.remove_links, text_only=True)
-            self.apply_to_fields(document, self.remove_punctuations, text_only=True)
+            self.apply_to_fields(document, self.remove_punctuations)
             self.apply_to_fields(document, self.remove_stopwords, text_only=True)
             self.apply_to_fields(document, self.tokenize)
             self.apply_to_fields(document, self.normalize)
+            self.flatten(document)
         return self.documents
     
+    def flatten(self, document):
+        document['summaries'] = [x for xs in document['summaries'] for x in xs]
+        document['synopsis'] = [x for xs in document['synopsis'] for x in xs]
+        document['reviews'] = [x for xs in document['reviews'] for x in xs[0]]
+
+        # people
+        f = lambda s: len(s) > 1
+        document['directors'] = list(filter(f, [x for xs in document['directors'] for x in xs]))
+        document['writers'] = list(filter(f, [x for xs in document['writers'] for x in xs]))
+        document['stars'] = list(filter(f, [x for xs in document['stars'] for x in xs]))
+
+        # other
+        document['genres'] = [x for xs in document['genres'] for x in xs]
+        document['languages'] = [x for xs in document['languages'] for x in xs]
+        document['countries_of_origin'] = [x for xs in document['countries_of_origin'] for x in xs]
+
     def apply_to_fields(self, document, f, apply_to_names=True, text_only=False):
         # texts
         document['title'] = f(document['title'])
@@ -142,6 +159,15 @@ class Preprocessor:
         str
             The text with punctuations removed.
         """
+        matches = re.finditer(r'(^|\s)([A-Za-z]\.(?:[A-Za-z]\.)+)', text)
+        result = ""
+        last_end = 0
+        for match in matches:
+            start, end = match.span()
+            result += text[last_end:start] + match.group(1) + match.group(2).replace('.', '')
+            last_end = end
+        result += text[last_end:]
+        text = result
         text = re.sub(r'([A-Za-z])(\.)([A-Za-z])', r'\1\2 \3', text)
         return text.translate(str.maketrans('', '', string.punctuation))
 

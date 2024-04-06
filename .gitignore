@@ -164,3 +164,5 @@ IMDB_crawled.json
 IMDB_not_crawled.json
 Logic/.DS_Store
 .DS_Store
+index/
+IMDB_crawled_pre_processed.json

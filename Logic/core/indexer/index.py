@@ -4,7 +4,6 @@ import json
 import copy
 from indexes_enum import Indexes
 
-
 class Index:
     def __init__(self, preprocessed_documents: list):
         """
@@ -13,12 +12,31 @@ class Index:
 
         self.preprocessed_documents = preprocessed_documents
 
-        self.index = {
-            Indexes.DOCUMENTS.value: self.index_documents(),
-            Indexes.STARS.value: self.index_stars(),
-            Indexes.GENRES.value: self.index_genres(),
-            Indexes.SUMMARIES.value: self.index_summaries(),
+        self.idx_to_fields = {
+            Indexes.STARS: ['first_page_summary', 'directors', 'writers', 'stars', 'summaries', 'synopsis', 'reviews'],
+            Indexes.GENRES: ['first_page_summary', 'summaries', 'synopsis', 'reviews', 'genres'],
+            Indexes.SUMMARIES: ['summaries']
         }
+
+        self.index = None
+        self.path = 'index/'
+        try:
+            self.index = self.load_index(self.path)
+        except:
+            print('at least one of index files not found. Getting ')
+            self.index = {
+                Indexes.DOCUMENTS.value: self.index_documents(),
+                Indexes.STARS.value: self.index_stars(),
+                Indexes.GENRES.value: self.index_genres(),
+                Indexes.SUMMARIES.value: self.index_summaries(),
+            }
+            for idx in Indexes:
+                self.store_index(self.path, idx.value)
+    
+    def get_token_tf(self, doc, id, s, doc_tfs, type):
+        if s not in doc_tfs:
+            doc_tfs[id][s] = sum([(doc[field].count(s) if field in doc.keys() else 0) for field in self.idx_to_fields[type]])
+        return doc_tfs[id][s]
 
     def index_documents(self):
         """
@@ -32,8 +50,8 @@ class Index:
         """
 
         current_index = {}
-        #         TODO
-
+        for doc in self.preprocessed_documents:
+            current_index[doc['id']] = doc
         return current_index
 
     def index_stars(self):
@@ -46,9 +64,19 @@ class Index:
             The index of the documents based on the stars. You should also store each terms' tf in each document.
             So the index type is: {term: {document_id: tf}}
         """
+        doc_tfs = {}
 
-        #         TODO
-        pass
+        stars_map = {}
+        for doc in self.preprocessed_documents:
+            id = doc['id']
+            doc_tfs[id] = {}
+            for s in doc['stars']:
+                if s not in stars_map.keys():
+                    stars_map[s] = {id: self.get_token_tf(doc, id, s, doc_tfs, Indexes.STARS)}
+                elif id not in stars_map[s].keys():
+                    stars_map[s][id] = self.get_token_tf(doc, id, s, doc_tfs, Indexes.STARS)
+        stars_map = dict(sorted(stars_map.items()))
+        return stars_map
 
     def index_genres(self):
         """
@@ -60,9 +88,19 @@ class Index:
             The index of the documents based on the genres. You should also store each terms' tf in each document.
             So the index type is: {term: {document_id: tf}}
         """
+        doc_tfs = {}
 
-        #         TODO
-        pass
+        genres_map = {}
+        for doc in self.preprocessed_documents:
+            id = doc['id']
+            doc_tfs[id] = {}
+            for s in doc['genres']:
+                if s not in genres_map.keys():
+                    genres_map[s] = {id: self.get_token_tf(doc, id, s, doc_tfs, Indexes.GENRES)}
+                elif id not in genres_map[s].keys():
+                    genres_map[s][id] = self.get_token_tf(doc, id, s, doc_tfs, Indexes.GENRES)
+        genres_map = dict(sorted(genres_map.items()))
+        return genres_map
 
     def index_summaries(self):
         """
@@ -76,7 +114,16 @@ class Index:
         """
 
         current_index = {}
-        #         TODO
+        doc_tfs = {}
+        for doc in self.preprocessed_documents:
+            id = doc['id']
+            doc_tfs[id] = {}
+            for s in doc['summaries']:
+                if s not in current_index.keys():
+                    current_index[s] = {id: self.get_token_tf(doc, id, s, doc_tfs, Indexes.SUMMARIES)}
+                elif id not in current_index[s].keys():
+                    current_index[s][id] = self.get_token_tf(doc, id, s, doc_tfs, Indexes.SUMMARIES)
+        current_index = dict(sorted(current_index.items()))
 
         return current_index
 
@@ -98,8 +145,7 @@ class Index:
         """
 
         try:
-            #         TODO
-            pass
+            return self.index[index_type][word].keys()
         except:
             return []
 
@@ -113,8 +159,19 @@ class Index:
             Document to add to all the indexes
         """
 
-        #         TODO
-        pass
+        id = document['id']
+        for index in Indexes:
+            m = self.index[index.value]
+            if index == Indexes.DOCUMENTS:
+                m[id] = document
+                continue
+            doc_tfs = {id: {}}
+            for s in document[index.value]:
+                if s not in m.keys():
+                    m[s] = {id: self.get_token_tf(document, id, s, doc_tfs, index)}
+                elif id not in m[s].keys():
+                    m[s][id] = self.get_token_tf(document, id, s, doc_tfs, index)
+            self.store_index(self.path, index.value)
 
     def remove_document_from_index(self, document_id: str):
         """
@@ -126,8 +183,14 @@ class Index:
             ID of the document to remove from all the indexes
         """
 
-        #         TODO
-        pass
+        for index in Indexes:
+            m = self.index[index.value]
+            if index == Indexes.DOCUMENTS:
+                m.pop(document_id)
+                continue
+            for _,t in m.items():
+                t.pop(document_id, -1)
+            self.store_index(self.path, index.value)
 
     def check_add_remove_is_correct(self):
         """
@@ -200,9 +263,10 @@ class Index:
 
         if index_name not in self.index:
             raise ValueError('Invalid index name')
-
-        # TODO
-        pass
+        
+        with open(path + index_name + '_index.json', 'w+') as f:
+            f.write(json.dumps(self.index[index_name], indent=1))
+            f.close()
 
     def load_index(self, path: str):
         """
@@ -213,9 +277,11 @@ class Index:
         path : str
             Path to load the file
         """
+        def get_map(idx):
+            with open(path + idx + '.json', 'r') as f:
+                return json.load(f)
 
-        #         TODO
-        pass
+        return {idx.value:get_map(idx.value) for idx in Indexes}
 
     def check_if_index_loaded_correctly(self, index_type: str, loaded_index: dict):
         """
@@ -297,4 +363,11 @@ class Index:
             print('Indexing is wrong')
             return False
 
-# TODO: Run the class with needed parameters, then run check methods and finally report the results of check methods
+documents = None
+with open('IMDB_crawled_pre_processed.json', 'r') as f:
+    documents = json.load(f)
+    f.close()
+idx = Index(documents)
+for i in Indexes:
+    assert idx.check_if_index_loaded_correctly(i.value, idx.index[i.value])
+assert idx.check_if_indexing_is_good(Indexes.GENRES.value, 'action')

@@ -6,6 +6,7 @@ import json
 import re
 import requests
 import threading
+from preprocess import Preprocessor
 	
 def synchronized(func):
 	
@@ -46,7 +47,7 @@ class IMDbCrawler:
         crawling_threshold: int
             The number of pages to crawl
         """
-        # TODO
+
         self.crawling_threshold = crawling_threshold
         self.frontier = []
         self.read_from_file_as_json()
@@ -314,8 +315,17 @@ class IMDbCrawler:
 
 
 def main():
-    imdb_crawler = IMDbCrawler(crawling_threshold=1200)
+    imdb_crawler = IMDbCrawler(crawling_threshold=200)
     imdb_crawler.start_crawling()
+    documents = None
+    with open('IMDB_crawled.json', 'r') as f:
+            documents = json.load(f)
+            f.close()
+    print('preprocessing...')
+    preprocessor = Preprocessor(documents)
+    with open('IMDB_crawled_pre_processed.json', 'w+') as f:
+        documents = json.dump(preprocessor.preprocess(), f, indent=1)
+        f.close()
 
 if __name__ == '__main__':
     main()

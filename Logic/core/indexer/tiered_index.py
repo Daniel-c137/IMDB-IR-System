@@ -1,5 +1,5 @@
-from .indexes_enum import Indexes, Index_types
-from .index_reader import Index_reader
+from indexes_enum import Indexes, Index_types
+from index_reader import Index_reader
 import json
 
 
@@ -61,7 +61,23 @@ class Tiered_index:
         first_tier = {}
         second_tier = {}
         third_tier = {}
-        #TODO
+        for term,postings in current_index.items():
+            for id,tf in postings.items():
+                if tf > first_tier_threshold:
+                    if term not in first_tier.keys():
+                        first_tier[term] = {id: tf}
+                    else:
+                        first_tier[term][id] = tf
+                elif tf > second_tier_threshold:
+                    if term not in second_tier.keys():
+                        second_tier[term] = {id: tf}
+                    else:
+                        second_tier[term][id] = tf
+                else:
+                    if term not in third_tier.keys():
+                        third_tier[term] = {id: tf}
+                    else:
+                        third_tier[term][id] = tf
         return {
             "first_tier": first_tier,
             "second_tier": second_tier,
@@ -73,7 +89,7 @@ class Tiered_index:
         Stores the tiered index to a file.
         """
         path = path + index_name.value + "_" + Index_types.TIERED.value + "_index.json"
-        with open(path, "w") as file:
+        with open(path, "w+") as file:
             json.dump(self.tiered_index[index_name], file, indent=4)
 
 
