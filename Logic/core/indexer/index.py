@@ -14,8 +14,8 @@ class Index:
 
         self.idx_to_fields = {
             Indexes.STARS: ['first_page_summary', 'directors', 'writers', 'stars', 'summaries', 'synopsis', 'reviews'],
-            Indexes.GENRES: ['first_page_summary', 'summaries', 'synopsis', 'reviews', 'genres'],
-            Indexes.SUMMARIES: ['summaries']
+            Indexes.GENRES: ['first_page_summary', 'directors', 'writers', 'stars', 'summaries', 'synopsis', 'reviews'],
+            Indexes.SUMMARIES: ['first_page_summary', 'directors', 'writers', 'stars', 'summaries', 'synopsis', 'reviews'],
         }
 
         self.index = None

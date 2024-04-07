@@ -1,5 +1,10 @@
+from indexer.index_reader import Index_reader
+from indexer.indexes_enum import Indexes
+import math
+import json
+
 class SpellCorrection:
-    def __init__(self, all_documents):
+    def __init__(self, all_documents, path='index/'):
         """
         Initialize the SpellCorrection
 
@@ -8,6 +13,11 @@ class SpellCorrection:
         all_documents : list of str
             The input documents.
         """
+        self.index = {
+            Indexes.STARS: Index_reader(path, index_name=Indexes.STARS).index,
+            Indexes.GENRES: Index_reader(path, index_name=Indexes.GENRES).index,
+            Indexes.SUMMARIES: Index_reader(path, index_name=Indexes.SUMMARIES).index,
+        }
         self.all_shingled_words, self.word_counter = self.shingling_and_counting(all_documents)
 
     def shingle_word(self, word, k=2):
@@ -26,11 +36,17 @@ class SpellCorrection:
         set
             A set of shingles.
         """
+        if len(word) <= k:
+            return set(word)
         shingles = set()
-        
-        # TODO: Create shingle here
+        for i in range(len(word) - k + 1):
+            shingles.add(word[i:i+k])
 
         return shingles
+    
+    def tf_score(self, tf):
+        return math.log(tf)
+        return (tf - self.min_cnt) / (self.max_cnt - self.min_cnt)
     
     def jaccard_score(self, first_set, second_set):
         """
@@ -49,9 +65,7 @@ class SpellCorrection:
             Jaccard score.
         """
 
-        # TODO: Calculate jaccard score here.
-
-        return
+        return len(first_set.intersection(second_set)) / len(first_set.union(second_set))
 
     def shingling_and_counting(self, all_documents):
         """
@@ -72,7 +86,32 @@ class SpellCorrection:
         all_shingled_words = dict()
         word_counter = dict()
 
-        # TODO: Create shingled words dictionary and word counter dictionary here.
+        def find_tf(word):
+            for idx in [Indexes.SUMMARIES, Indexes.STARS, Indexes.GENRES]:
+                try:
+                    return sum(self.index[idx][word].values())
+                except:
+                    # print(f'word {word} not found in {idx.value}.')
+                    pass
+            print(f'word {word} not found in any indices')
+            return 1
+
+        indexed_fields = [idx.value for idx in Indexes]
+        self.max_cnt = 0
+        self.min_cnt = math.inf
+        for doc in all_documents:
+            for k, words in doc.items():
+                if k not in indexed_fields:
+                    continue
+                for w in words:
+                    if not w.isdigit() and w not in all_shingled_words.keys():
+                        all_shingled_words[w] = self.shingle_word(w)
+                        cnt = find_tf(w)
+                        word_counter[w] = cnt
+                        self.max_cnt = max(cnt, self.max_cnt)
+                        self.min_cnt = min(cnt, self.min_cnt)
+
+        word_counter = dict(sorted(word_counter.items(), key=lambda item: -1 * item[1]))
                 
         return all_shingled_words, word_counter
     
@@ -90,11 +129,17 @@ class SpellCorrection:
         list of str
             5 nearest words.
         """
-        top5_candidates = list()
+        shingles = self.shingle_word(word)
+        top5_candidates = [(None, 0) for _ in range(5)]
+        min_id = 0
+        for t, tf in self.word_counter.items():
+            dif = abs(len(t) - len(word))
+            score = self.tf_score(tf) * self.jaccard_score(shingles, self.all_shingled_words[t])
+            if score > top5_candidates[min_id][1]:
+                top5_candidates[min_id] = (t, score)
+                min_id = top5_candidates.index(min(top5_candidates, key=lambda a: a[1]))
 
-        # TODO: Find 5 nearest candidates here.
-
-        return top5_candidates
+        return list(sorted(top5_candidates, key=lambda item: -1 * item[1]))
     
     def spell_check(self, query):
         """
@@ -112,6 +157,14 @@ class SpellCorrection:
         """
         final_result = ""
         
-        # TODO: Do spell correction here.
+        for word in query.split():
+            print(self.find_nearest_words(word))
 
         return final_result
+    
+documents = None
+with open('IMDB_crawled_pre_processed.json', 'r') as f:
+    documents = json.load(f)
+    f.close()
+s = SpellCorrection(documents)
+s.spell_check('whle')
