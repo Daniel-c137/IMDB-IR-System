@@ -157,7 +157,6 @@ class IMDbCrawler:
     def start_crawling(self):
         """
         Start crawling the movies until the crawling threshold is reached.
-        TODO: 
             replace WHILE_LOOP_CONSTRAINTS with the proper constraints for the while loop.
             replace NEW_URL with the new URL to crawl.
             replace THERE_IS_NOTHING_TO_CRAWL with the condition to check if there is nothing to crawl.

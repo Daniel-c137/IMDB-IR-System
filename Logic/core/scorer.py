@@ -65,8 +65,8 @@ class Scorer:
         """
         idf = self.idf.get(term, None)
         if idf is None:
-            # TODO
-            pass
+            idf = np.log10(self.N / len(self.index[term].keys()))
+            self.idf[term] = idf
         return idf
     
     def get_query_tfs(self, query):
@@ -84,7 +84,7 @@ class Scorer:
             A dictionary of the term frequencies of the terms in the query.
         """
         
-        #TODO
+        return {term: query.count(term) for term in set(query)}
 
 
     def compute_scores_with_vector_space_model(self, query, method):
@@ -104,8 +104,13 @@ class Scorer:
             A dictionary of the document IDs and their scores.
         """
 
-        # TODO
-        pass
+        result = {}
+        for doc in self.get_list_of_documents(query):
+            doc_meth, quey_meth = method.split('.')
+            id = doc['id']
+            score = self.get_vector_space_model_score(query, self.get_query_tfs(query), id, doc_meth, quey_meth)
+            result[id] = score
+        return result
 
     def get_vector_space_model_score(self, query, query_tfs, document_id, document_method, query_method):
         """
@@ -129,9 +134,30 @@ class Scorer:
         float
             The Vector Space Model score of the document for the query.
         """
+        def get_tf_idf(tf_meth, df_meth, tf, idf):
+            new_tf = tf if tf_meth == 'n' else 1 + np.log10(tf) if tf_meth == 'l' else None
+            new_idf = 1 if df_meth == 'n' else idf if df_meth == 't' else None
+            return new_tf * new_idf
+        def normalize(v):
+            return v / np.linalg.norm(v)
+        
+        doc_vec = []
+        q_vec = []
+        q_tf_meth, q_idf_meth, q_vec_meth = query_method
+        d_tf_meth, d_idf_meth, d_vec_meth = document_method
+        
+        for q, tf in query_tfs.items():
+            raw_idf = self.get_idf(q)
+            w_q = get_tf_idf(q_tf_meth, q_idf_meth, tf, raw_idf)
+            w_d = get_tf_idf(d_tf_meth, d_idf_meth, self.index[q][document_id], raw_idf)
+            doc_vec.append(w_d)
+            q_vec.append(w_q)
+        q_vec = np.array(q_vec)
+        q_vec = q_vec if q_vec_meth == 'n' else normalize(q_vec) if q_vec_meth == 'c' else None
+        doc_vec = np.array(doc_vec)
+        doc_vec = doc_vec if d_vec_meth == 'n' else normalize(doc_vec) if d_vec_meth == 'c' else None
+        return np.dot(doc_vec, q_vec)
 
-        #TODO
-        pass
 
     def compute_socres_with_okapi_bm25(self, query, average_document_field_length, document_lengths):
         """
@@ -153,10 +179,12 @@ class Scorer:
             A dictionary of the document IDs and their scores.
         """
 
-        # TODO
-        pass
+        result = {}
+        for doc in self.get_list_of_documents(query):
+            id = doc['id']
+            result[id] = self.get_okapi_bm25_score(query, id, average_document_field_length, document_lengths[id])
 
-    def get_okapi_bm25_score(self, query, document_id, average_document_field_length, document_lengths):
+    def get_okapi_bm25_score(self, query, document_id, average_document_field_length, document_length):
         """
         Returns the Okapi BM25 score of a document for a query.
 
@@ -168,15 +196,19 @@ class Scorer:
             The document to calculate the score for.
         average_document_field_length : float
             The average length of the documents in the index.
-        document_lengths : dict
-            A dictionary of the document lengths. The keys are the document IDs, and the values are
-            the document's length in that field.
+        document_lengths : Int
+            Length of current document
 
         Returns
         -------
         float
             The Okapi BM25 score of the document for the query.
         """
+        const = self.k * ((1 - self.b) + (self.b * document_length / average_document_field_length))
+        def calculate_tuning(tf):
+            return ((self.k + 1) * tf) / (const + tf)
 
-        # TODO
-        pass
+        rsv = 0
+        for q in query:
+            rsv += self.get_idf(q) * calculate_tuning(self.index[q][document_id])
+        return rsv

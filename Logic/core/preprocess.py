@@ -39,7 +39,6 @@ class Preprocessor:
         documents : list
             The list of documents to be preprocessed, path to stop words, or other parameters.
         """
-        # TODO
         self.documents = documents
         with open('Logic/core/stopwords.txt', 'r') as f:
             self.stopwords = set([w[:-1] for w in f.readlines()])
