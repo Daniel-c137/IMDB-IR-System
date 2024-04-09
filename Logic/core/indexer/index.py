@@ -341,7 +341,7 @@ class Index:
 
         # check by getting the posting list of the word
         start = time.time()
-        # TODO: based on your implementation, you may need to change the following line
+
         posting_list = self.get_posting_list(check_word, index_type)
 
         end = time.time()

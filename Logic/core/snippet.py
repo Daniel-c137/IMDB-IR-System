@@ -71,11 +71,11 @@ class Snippet:
             if q in doc['title']:
                 f = True
                 title_found = True
-                title = title.replace(q, f'**{q}**')
+                title = title.replace(q, f'***{q}***')
             if q in doc['genres']:
                 f = True
                 genre_found = True
-                genres = genres.replace(q, f'**{q}**')
+                genres = genres.replace(q, f'***{q}***')
             if q in summs:
                 f = True
                 intervals = [(max(i - self.number_of_words_on_each_side,0), min(i + self.number_of_words_on_each_side, len(summs))) for i, x in enumerate(summs) if x == q]
@@ -104,7 +104,7 @@ class Snippet:
             if prev_end and prev_end >= begin:
                 if prev_end < len(summs):
                     b =  prev_end + 1
-            final_snippet = final_snippet + ' '.join([f'**{s}**' if s in qs else s for s in summs[b: end]]) + ' ... '
+            final_snippet = final_snippet + ' '.join([f'***{s}***' if s in qs else s for s in summs[b: end]]) + ' ... '
             prev_end = end
 
         return final_snippet, not_exist_words

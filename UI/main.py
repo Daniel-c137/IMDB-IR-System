@@ -2,7 +2,9 @@ import streamlit as st
 import sys
 
 sys.path.append("../")
-from Logic import utils
+import os
+sys.path.append(os.path.abspath(os.path.join('..', 'IMDB-IR-System')))
+from Logic.utils import correct_text,search,get_movie_by_id,movies_dataset
 import time
 from enum import Enum
 import random
@@ -23,9 +25,10 @@ class color(Enum):
     MAGENTA = "#FF00FF"
 
 
-def get_summary_with_snippet(movie_info, query):
+def get_summary_with_snippet(movie_info, processed_info, query):
     summary = movie_info["first_page_summary"]
-    snippet, not_exist_words = snippet_obj.find_snippet(summary, query)
+    snippet, not_exist_words = snippet_obj.find_snippet(processed_info, query)
+    print('snippet:', snippet)
     if "***" in snippet:
         snippet = snippet.split()
         for i in range(len(snippet)):
@@ -51,7 +54,7 @@ def search_handling(
     search_method,
 ):
     if search_button:
-        corrected_query = utils.correct_text(search_term, utils.movies_dataset)
+        corrected_query = correct_text(search_term)
 
         if corrected_query != search_term:
             st.warning(f"Your search terms were corrected to: {corrected_query}")
@@ -60,7 +63,7 @@ def search_handling(
         with st.spinner("Searching..."):
             time.sleep(0.5)  # for showing the spinner! (can be removed)
             start_time = time.time()
-            result = utils.search(
+            result = search(
                 search_term,
                 search_max_num,
                 search_method,
@@ -76,13 +79,13 @@ def search_handling(
 
             for i in range(len(result)):
                 card = st.columns([3, 1])
-                info = utils.get_movie_by_id(result[i][0], utils.movies_dataset)
+                info, processed_info = get_movie_by_id(result[i][0], movies_dataset)
                 with card[0].container():
                     st.title(info["title"])
                     st.markdown(f"[Link to movie]({info['URL']})")
                     st.write(f"Relevance Score: {result[i][1]}")
                     st.markdown(
-                        f"<b><font size = '4'>Summary:</font></b> {get_summary_with_snippet(info, search_term)}",
+                        f"<b><font size = '4'>Summary:</font></b> {get_summary_with_snippet(info, processed_info, search_term)}",
                         unsafe_allow_html=True,
                     )
 

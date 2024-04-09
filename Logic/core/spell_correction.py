@@ -1,5 +1,5 @@
-from indexer.index_reader import Index_reader
-from indexer.indexes_enum import Indexes
+from .indexer.index_reader import Index_reader
+from .indexer.indexes_enum import Indexes
 import math
 import json
 
@@ -139,7 +139,7 @@ class SpellCorrection:
                 top5_candidates[min_id] = (t, score)
                 min_id = top5_candidates.index(min(top5_candidates, key=lambda a: a[1]))
 
-        return list(sorted(top5_candidates, key=lambda item: -1 * item[1]))
+        return list(sorted(top5_candidates, key=lambda item: item[1], reverse=True))
     
     def spell_check(self, query):
         """
@@ -155,16 +155,9 @@ class SpellCorrection:
         str
             Correct form of the query.
         """
-        final_result = ""
+        final_result = []
         
         for word in query.split():
-            print(self.find_nearest_words(word))
+            final_result.append(self.find_nearest_words(word)[0][0])
 
-        return final_result
-    
-documents = None
-with open('IMDB_crawled_pre_processed.json', 'r') as f:
-    documents = json.load(f)
-    f.close()
-s = SpellCorrection(documents)
-s.spell_check('whle')
+        return ' '.join(final_result)

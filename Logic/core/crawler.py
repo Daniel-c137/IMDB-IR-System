@@ -281,6 +281,7 @@ class IMDbCrawler:
         main_data = res['props']['pageProps']['mainColumnData']
         movie['id'] = res['props']['pageProps']['tconst']
         movie['title'] = self.beautify(data['titleText']['text']) if data['titleText'] else ''
+        movie['Image_URL'] = data['primaryImage']['url']
         movie['first_page_summary'] = self.beautify(data['plot']['plotText']['plainText']) if data['plot'] and data['plot']['plotText'] else ''
         movie['release_year'] = str(data['releaseYear']['year']) if data['releaseYear'] else ''
         movie['mpaa'] = data['certificate']['rating'] if data['certificate'] else ""

@@ -2,8 +2,8 @@ import json
 import numpy as np
 from .preprocess import Preprocessor
 from .scorer import Scorer
-from .indexes_enum import Indexes, Index_types
-from .index_reader import Index_reader
+from .indexer.indexes_enum import Indexes, Index_types
+from .indexer.index_reader import Index_reader
 
 
 class SearchEngine:
@@ -12,7 +12,7 @@ class SearchEngine:
         Initializes the search engine.
 
         """
-        path = '/index'
+        path = 'index/'
         self.document_indexes = {
             Indexes.STARS: Index_reader(path, Indexes.STARS),
             Indexes.GENRES: Index_reader(path, Indexes.GENRES),
@@ -29,6 +29,7 @@ class SearchEngine:
             Indexes.SUMMARIES: Index_reader(path, Indexes.SUMMARIES, Index_types.DOCUMENT_LENGTH)
         }
         self.metadata_index = Index_reader(path, Indexes.DOCUMENTS, Index_types.METADATA)
+        self.N = self.metadata_index.index['document_count']
 
     def search(self, query, method, weights, safe_ranking = True, max_results=10):
         """
@@ -54,8 +55,8 @@ class SearchEngine:
             A list of tuples containing the document IDs and their scores sorted by their scores.
         """
 
-        preprocessor = Preprocessor([query])
-        query = preprocessor.preprocess()[0].split()
+        preprocessor = Preprocessor([query], False)
+        query = preprocessor.preprocess()[0]
 
         scores = {}
         if safe_ranking:
@@ -65,7 +66,7 @@ class SearchEngine:
 
         final_scores = {}
 
-        self.aggregate_scores(weights, scores, final_scores)
+        self.aggregate_scores(scores, final_scores)
         
         result = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
         if max_results is not None:
@@ -73,7 +74,7 @@ class SearchEngine:
 
         return result
 
-    def aggregate_scores(self, weights, scores, final_scores):
+    def aggregate_scores(self, scores, final_scores):
         """
         Aggregates the scores of the fields.
 
@@ -86,10 +87,10 @@ class SearchEngine:
         final_scores : dict
             The final scores of the documents.
         """
-        # TODO
-        pass
+        for id, score in scores.items():
+            final_scores[id] = score
 
-    def find_scores_with_unsafe_ranking(self, query, method, weights, max_results, scores):
+    def find_scores_with_unsafe_ranking(self, query, method, weights, scores):
         """
         Finds the scores of the documents using the unsafe ranking method using the tiered index.
 
@@ -101,15 +102,21 @@ class SearchEngine:
             The method to use for searching.
         weights: dict
             The weights of the fields.
-        max_results : int
-            The maximum number of results to return.
         scores : dict
             The scores of the documents.
         """
-        for field in weights:
+        for field, w in weights.items():
             for tier in ["first_tier", "second_tier", "third_tier"]:
-                #TODO
-                pass
+                self.do_score(field, w, query, method, tier, scores)
+        # res = {}
+        # scores = dict(sorted(scores.items(), key=lambda x: sum(x[1])))
+        # cnt = 0
+        # for id, score in scores.items():
+        #     res[id] = score
+        #     cnt += 1
+        #     if cnt >= max_results:
+        #         break
+        # scores = res
 
     def find_scores_with_safe_ranking(self, query, method, weights, scores):
         """
@@ -127,9 +134,23 @@ class SearchEngine:
             The scores of the documents.
         """
 
-        for field in weights:
-            #TODO
-            pass
+        for field, w in weights.items():
+            self.do_score(field, w, query, method, 'first_tier', scores)
+
+    def do_score(self, field, weight, query, method, tier, scores):
+        idx = self.tiered_index[field].index[tier]
+        scorer = Scorer(idx, self.N)
+        result = {}
+        if method == 'OkapiBM25':
+            result = scorer.compute_socres_with_okapi_bm25(query, self.metadata_index.index['averge_document_length'][field.value], self.document_lengths_index[field])
+        else:
+            result = scorer.compute_scores_with_vector_space_model(query, method)
+        for id, score in result.items():
+            prev = scores.get(id, None)
+            if prev is None:
+                scores[id] = score * weight
+            else:
+                scores[id] += score * weight
 
     def merge_scores(self, scores1, scores2):
         """
@@ -148,7 +169,7 @@ class SearchEngine:
             The merged dictionary of scores.
         """
 
-        #TODO
+        pass
 
 
 if __name__ == '__main__':

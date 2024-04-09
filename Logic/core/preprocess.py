@@ -30,7 +30,7 @@ def get_wordnet_pos(word):
 
 class Preprocessor:
 
-    def __init__(self, documents: list):
+    def __init__(self, documents: list, json_processor = True):
         """
         Initialize the class.
 
@@ -44,6 +44,7 @@ class Preprocessor:
             self.stopwords = set([w[:-1] for w in f.readlines()])
         self.stemmer = PorterStemmer()
         self.lemmatizer = WordNetLemmatizer()
+        self.json_processor = json_processor
 
     def preprocess(self):
         """
@@ -54,6 +55,15 @@ class Preprocessor:
         List[str]
             The preprocessed documents.
         """
+        if not self.json_processor:
+            text = self.documents[0]
+            text = self.prepreprocess(text)
+            text = self.remove_links(text)
+            text = self.remove_punctuations(text)
+            text = self.remove_stopwords(text)
+            text = self.tokenize(text)
+            text = self.normalize(text)
+            return [text]
         for document in self.documents:
             self.apply_to_fields(document, self.prepreprocess)
             self.apply_to_fields(document, self.remove_links, text_only=True)

@@ -65,7 +65,10 @@ class Scorer:
         """
         idf = self.idf.get(term, None)
         if idf is None:
-            idf = np.log10(self.N / len(self.index[term].keys()))
+            docs = self.index.get(term, None)
+            if docs is None:
+                return 0
+            idf = np.log10(self.N / len(docs.keys()))
             self.idf[term] = idf
         return idf
     
@@ -105,9 +108,8 @@ class Scorer:
         """
 
         result = {}
-        for doc in self.get_list_of_documents(query):
+        for id in self.get_list_of_documents(query):
             doc_meth, quey_meth = method.split('.')
-            id = doc['id']
             score = self.get_vector_space_model_score(query, self.get_query_tfs(query), id, doc_meth, quey_meth)
             result[id] = score
         return result
@@ -135,7 +137,7 @@ class Scorer:
             The Vector Space Model score of the document for the query.
         """
         def get_tf_idf(tf_meth, df_meth, tf, idf):
-            new_tf = tf if tf_meth == 'n' else 1 + np.log10(tf) if tf_meth == 'l' else None
+            new_tf = tf if tf_meth == 'n' else 1 + (np.log10(tf) if tf != 0 else 0) if tf_meth == 'l' else None
             new_idf = 1 if df_meth == 'n' else idf if df_meth == 't' else None
             return new_tf * new_idf
         def normalize(v):
@@ -149,7 +151,8 @@ class Scorer:
         for q, tf in query_tfs.items():
             raw_idf = self.get_idf(q)
             w_q = get_tf_idf(q_tf_meth, q_idf_meth, tf, raw_idf)
-            w_d = get_tf_idf(d_tf_meth, d_idf_meth, self.index[q][document_id], raw_idf)
+            docs = self.index.get(q, None)
+            w_d = get_tf_idf(d_tf_meth, d_idf_meth, 0 if docs is None else docs.get(document_id, 0), raw_idf)
             doc_vec.append(w_d)
             q_vec.append(w_q)
         q_vec = np.array(q_vec)
@@ -180,8 +183,7 @@ class Scorer:
         """
 
         result = {}
-        for doc in self.get_list_of_documents(query):
-            id = doc['id']
+        for id in self.get_list_of_documents(query):
             result[id] = self.get_okapi_bm25_score(query, id, average_document_field_length, document_lengths[id])
 
     def get_okapi_bm25_score(self, query, document_id, average_document_field_length, document_length):
