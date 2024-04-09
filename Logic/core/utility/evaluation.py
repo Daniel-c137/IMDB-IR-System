@@ -2,7 +2,9 @@
 from typing import List
 from numpy import log2
 from wandb import log
+import wandb
 
+wandb.init()
 class Evaluation:
 
     def __init__(self, name: str):
@@ -167,7 +169,7 @@ class Evaluation:
             rank_gain = 0
             for j, movie in enumerate(ranking):
                 if movie in actual_ranking:
-                    rate = len(actual_ranking) - actual.index(movie)
+                    rate = len(actual_ranking) - actual_ranking.index(movie)
                     if j == 0:
                         rank_gain += rate
                     else:
@@ -205,7 +207,7 @@ class Evaluation:
                 else:
                     nf += opt_rate / log2(j + 1)
                 if movie in actual_ranking:
-                    rate = len(actual_ranking) - actual.index(movie)
+                    rate = len(actual_ranking) - actual_ranking.index(movie)
                     if j == 0:
                         rank_gain += rate
                     else:
@@ -370,5 +372,4 @@ class Evaluation:
         self.print_evaluation(precision, recall, f1, map_score, dcg, ndcg, mrr)
         self.log_evaluation(precision, recall, f1, map_score, dcg, ndcg, mrr)
 
-
-
+# Evaluation('test').calculate_evaluation([['a', 'b', 'c'], ['b', 'c', 'e']], [['e', 'a', 'c', 'b'], ['c', 'e', 'b']])
