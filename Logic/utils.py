@@ -37,6 +37,7 @@ def correct_text(text: str) -> str:
         The corrected form of the given text
     """
     # any preprocessing steps here
+    text = text.lower()
     spell_correction_obj = SpellCorrection(documents)
     text = spell_correction_obj.spell_check(text)
     return text
