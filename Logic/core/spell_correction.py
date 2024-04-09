@@ -45,8 +45,7 @@ class SpellCorrection:
         return shingles
     
     def tf_score(self, tf):
-        return math.log(tf)
-        return (tf - self.min_cnt) / (self.max_cnt - self.min_cnt)
+        return math.log10(tf)
     
     def jaccard_score(self, first_set, second_set):
         """
@@ -65,7 +64,7 @@ class SpellCorrection:
             Jaccard score.
         """
 
-        return len(first_set.intersection(second_set)) / len(first_set.union(second_set))
+        return (len(first_set.intersection(second_set)) ** 1.8) / len(first_set.union(second_set))
 
     def shingling_and_counting(self, all_documents):
         """
@@ -87,25 +86,25 @@ class SpellCorrection:
         word_counter = dict()
 
         def find_tf(word):
+            total = 0
             for idx in [Indexes.SUMMARIES, Indexes.STARS, Indexes.GENRES]:
                 try:
-                    return sum(self.index[idx][word].values())
+                    total += sum(self.index[idx][word].values())
                 except:
                     # print(f'word {word} not found in {idx.value}.')
                     pass
-            print(f'word {word} not found in any indices')
-            return 1
+            return total
 
         indexed_fields = [idx.value for idx in Indexes]
         self.max_cnt = 0
         self.min_cnt = math.inf
         for doc in all_documents:
-            for k, words in doc.items():
-                if k not in indexed_fields:
+            for field, words in doc.items():
+                if field not in indexed_fields:
                     continue
                 for w in words:
                     if not w.isdigit() and w not in all_shingled_words.keys():
-                        all_shingled_words[w] = self.shingle_word(w)
+                        all_shingled_words[w] = [self.shingle_word(w, k + 1) for k in range(3)]
                         cnt = find_tf(w)
                         word_counter[w] = cnt
                         self.max_cnt = max(cnt, self.max_cnt)
@@ -129,17 +128,26 @@ class SpellCorrection:
         list of str
             5 nearest words.
         """
-        shingles = self.shingle_word(word)
         top5_candidates = [(None, 0) for _ in range(5)]
         min_id = 0
         for t, tf in self.word_counter.items():
-            dif = abs(len(t) - len(word))
-            score = self.tf_score(tf) * self.jaccard_score(shingles, self.all_shingled_words[t])
+            if word == t:
+                return [(t, 100)]
+            score = 0
+            word_shingles = self.all_shingled_words[t]
+            for k in range(3):
+                shingles = self.shingle_word(word, k + 1)
+                score += self.jaccard_score(shingles, word_shingles[k])
+                if t == 'batman':
+                    print('score:', score, word_shingles[k], shingles)
+            score *= self.tf_score(tf)
             if score > top5_candidates[min_id][1]:
                 top5_candidates[min_id] = (t, score)
                 min_id = top5_candidates.index(min(top5_candidates, key=lambda a: a[1]))
-
-        return list(sorted(top5_candidates, key=lambda item: item[1], reverse=True))
+        
+        r =  list(sorted(top5_candidates, key=lambda item: item[1], reverse=True))
+        print(r)
+        return r
     
     def spell_check(self, query):
         """
@@ -158,6 +166,9 @@ class SpellCorrection:
         final_result = []
         
         for word in query.split():
-            final_result.append(self.find_nearest_words(word)[0][0])
+            result = self.find_nearest_words(word)
+            print(result)
+            final_result.append(result[0][0])
+        print(final_result)
 
         return ' '.join(final_result)

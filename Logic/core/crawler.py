@@ -281,7 +281,7 @@ class IMDbCrawler:
         main_data = res['props']['pageProps']['mainColumnData']
         movie['id'] = res['props']['pageProps']['tconst']
         movie['title'] = self.beautify(data['titleText']['text']) if data['titleText'] else ''
-        movie['Image_URL'] = data['primaryImage']['url']
+        movie['Image_URL'] = data['primaryImage']['url'] if data['primaryImage'] else None
         movie['first_page_summary'] = self.beautify(data['plot']['plotText']['plainText']) if data['plot'] and data['plot']['plotText'] else ''
         movie['release_year'] = str(data['releaseYear']['year']) if data['releaseYear'] else ''
         movie['mpaa'] = data['certificate']['rating'] if data['certificate'] else ""
@@ -315,7 +315,7 @@ class IMDbCrawler:
 
 
 def main():
-    imdb_crawler = IMDbCrawler(crawling_threshold=200)
+    imdb_crawler = IMDbCrawler(crawling_threshold=1040)
     imdb_crawler.start_crawling()
     documents = None
     with open('IMDB_crawled.json', 'r') as f:

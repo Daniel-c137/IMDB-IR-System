@@ -99,7 +99,6 @@ class Snippet:
         token_intervals = dict(sorted(token_intervals.items(), key=lambda x: x[1][0]))
         prev_end = None
         for begin, end in token_intervals.values():
-            print(begin, end)
             b = begin
             if prev_end and prev_end >= begin:
                 if prev_end < len(summs):

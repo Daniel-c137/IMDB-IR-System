@@ -9,6 +9,7 @@ import time
 from enum import Enum
 import random
 from Logic.core.snippet import Snippet
+from Logic.core.preprocess import Preprocessor
 
 snippet_obj = Snippet(
     number_of_words_on_each_side=5
@@ -26,19 +27,24 @@ class color(Enum):
 
 
 def get_summary_with_snippet(movie_info, processed_info, query):
-    summary = movie_info["first_page_summary"]
+    summary = movie_info["first_page_summary"].lower()
     snippet, not_exist_words = snippet_obj.find_snippet(processed_info, query)
-    print('snippet:', snippet)
     if "***" in snippet:
         snippet = snippet.split()
         for i in range(len(snippet)):
             current_word = snippet[i]
             if current_word.startswith("***") and current_word.endswith("***"):
                 current_word_without_star = current_word[3:-3]
-                summary = summary.lower().replace(
-                    current_word_without_star,
-                    f"<b><font size='4' color={random.choice(list(color)).value}>{current_word_without_star}</font></b>",
-                )
+                new_sum = summary.split()
+                for i in range(len(new_sum)):
+                    pure_word = new_sum[i]
+                    prep = Preprocessor([pure_word], json_processor=False)
+                    res = prep.preprocess()[0]
+                    if len(res) == 0:
+                        continue
+                    if res[0] == current_word_without_star:
+                        new_sum[i] = f"<b><font size='4' color={random.choice(list(color)).value}>{pure_word}</font></b>"
+                summary = ' '.join(new_sum)
     return summary
 
 
