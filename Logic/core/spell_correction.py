@@ -138,15 +138,12 @@ class SpellCorrection:
             for k in range(3):
                 shingles = self.shingle_word(word, k + 1)
                 score += self.jaccard_score(shingles, word_shingles[k])
-                if t == 'batman':
-                    print('score:', score, word_shingles[k], shingles)
             score *= self.tf_score(tf)
             if score > top5_candidates[min_id][1]:
                 top5_candidates[min_id] = (t, score)
                 min_id = top5_candidates.index(min(top5_candidates, key=lambda a: a[1]))
         
         r =  list(sorted(top5_candidates, key=lambda item: item[1], reverse=True))
-        print(r)
         return r
     
     def spell_check(self, query):
@@ -167,8 +164,6 @@ class SpellCorrection:
         
         for word in query.split():
             result = self.find_nearest_words(word)
-            print(result)
             final_result.append(result[0][0])
-        print(final_result)
 
         return ' '.join(final_result)

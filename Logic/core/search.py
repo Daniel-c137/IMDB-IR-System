@@ -142,7 +142,7 @@ class SearchEngine:
         scorer = Scorer(idx, self.N)
         result = {}
         if method == 'OkapiBM25':
-            result = scorer.compute_socres_with_okapi_bm25(query, self.metadata_index.index['averge_document_length'][field.value], self.document_lengths_index[field])
+            result = scorer.compute_socres_with_okapi_bm25(query, self.metadata_index.index['averge_document_length'][field.value], self.document_lengths_index[field].index)
         else:
             result = scorer.compute_scores_with_vector_space_model(query, method)
         for id, score in result.items():

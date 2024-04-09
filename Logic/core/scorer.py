@@ -16,6 +16,8 @@ class Scorer:
         self.index = index
         self.idf = {}
         self.N = number_of_documents
+        self.k = 5
+        self.b = 0.1
 
     def get_list_of_documents(self,query):
         """
@@ -185,6 +187,7 @@ class Scorer:
         result = {}
         for id in self.get_list_of_documents(query):
             result[id] = self.get_okapi_bm25_score(query, id, average_document_field_length, document_lengths[id])
+        return result
 
     def get_okapi_bm25_score(self, query, document_id, average_document_field_length, document_length):
         """
@@ -212,5 +215,5 @@ class Scorer:
 
         rsv = 0
         for q in query:
-            rsv += self.get_idf(q) * calculate_tuning(self.index[q][document_id])
+            rsv += self.get_idf(q) * calculate_tuning(self.index[q].get(document_id, 0))
         return rsv
