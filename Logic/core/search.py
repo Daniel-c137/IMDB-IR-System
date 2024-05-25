@@ -118,8 +118,8 @@ class SearchEngine:
         final_scores : dict
             The final scores of the documents.
         """
-        # TODO
-        pass
+        for id, score in scores.items():
+            final_scores[id] = score
 
     def find_scores_with_unsafe_ranking(
         self, query, method, weights, max_results, scores
@@ -140,10 +140,18 @@ class SearchEngine:
         scores : dict
             The scores of the documents.
         """
-        for field in weights:
+        for field, w in weights.items():
             for tier in ["first_tier", "second_tier", "third_tier"]:
-                # TODO
-                pass
+                self.do_score(field, w, query, method, tier, scores)
+        # res = {}
+        # scores = dict(sorted(scores.items(), key=lambda x: sum(x[1])))
+        # cnt = 0
+        # for id, score in scores.items():
+        #     res[id] = score
+        #     cnt += 1
+        #     if cnt >= max_results:
+        #         break
+        # scores = res
 
     def find_scores_with_safe_ranking(self, query, method, weights, scores):
         """
@@ -161,9 +169,23 @@ class SearchEngine:
             The scores of the documents.
         """
 
-        for field in weights:
-            # TODO
-            pass
+        for field, w in weights.items():
+            self.do_score(field, w, query, method, 'first_tier', scores)
+
+    def do_score(self, field, weight, query, method, tier, scores):
+        idx = self.tiered_index[field].index[tier]
+        scorer = Scorer(idx, self.N)
+        result = {}
+        if method == 'OkapiBM25':
+            result = scorer.compute_socres_with_okapi_bm25(query, self.metadata_index.index['averge_document_length'][field.value], self.document_lengths_index[field].index)
+        else:
+            result = scorer.compute_scores_with_vector_space_model(query, method)
+        for id, score in result.items():
+            prev = scores.get(id, None)
+            if prev is None:
+                scores[id] = score * weight
+            else:
+                scores[id] += score * weight
 
     def find_scores_with_unigram_model(
         self, query, smoothing_method, weights, scores, alpha=0.5, lamda=0.5
@@ -187,8 +209,18 @@ class SearchEngine:
             The parameter used in some smoothing methods to balance between the document
             probability and the collection probability. Defaults to 0.5.
         """
-        # TODO
-        pass
+        for field, w in weights.items():
+            tier = 'first_tier'
+            self.do_score(field, w, query, method, tier, scores)
+            idx = self.tiered_index[field].index[tier]
+            scorer = Scorer(idx, self.N)
+            result = scorer.compute_scores_with_unigram_model(query, smoothing_method, self.document_lengths_index[field].index, alpha, lamda)
+            for id, score in result.items():
+                prev = scores.get(id, None)
+                if prev is None:
+                    scores[id] = score * w
+                else:
+                    scores[id] += score * w
 
     def merge_scores(self, scores1, scores2):
         """
