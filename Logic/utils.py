@@ -31,19 +31,22 @@ def correct_text(text: str) -> str:
         The query text
     all_documents : list of str
         The input documents.
+    all_documents : list of str
+        The input documents.
 
     Returns
     str
         The corrected form of the given text
     """
     # any preprocessing steps here
-    text = text.lower()
-    spell_correction_obj = SpellCorrection(documents)
-    text = spell_correction_obj.spell_check(text)
+    # text = text.lower()
+    # spell_correction_obj = SpellCorrection(documents)
+    # text = spell_correction_obj.spell_check(text)
     return text
 
 
 def search(
+    query: str,
     query: str,
     max_result_count: int,
     method: str = "ltn-lnn",
@@ -56,33 +59,34 @@ def search(
 
     Parameters
     ---------------------------------------------------------------------------------------------------
+    query:
+        The query text
+
     max_result_count: Return top 'max_result_count' docs which have the highest scores.
                       notice that if max_result_count = -1, then you have to return all docs
 
-    mode: 'detailed' for searching in title and text separately.
-          'overall' for all words, and weighted by where the word appears on.
-
-    where: when mode ='detailed', when we want search query
-            in title or text not both of them at the same time.
-
     method: 'ltn.lnn' or 'ltc.lnc' or 'OkapiBM25'
 
-    preferred_genre: A list containing preference rates for each genre. If None, the preference rates are equal.
+    weights:
+        The list, containing importance weights in the search result for each of these items:
+            Indexes.STARS: weights[0],
+            Indexes.GENRES: weights[1],
+            Indexes.SUMMARIES: weights[2],
+
+    preferred_genre:
+        A list containing preference rates for each genre. If None, the preference rates are equal.
+        (You can leave it None for now)
 
     Returns
     ----------------------------------------------------------------------------------------------------
     list
     Retrieved documents with snippet
     """
-    weight_stars, weight_genres, weight_summary = weights
-    weights = {
-        Indexes.STARS: weight_stars,
-        Indexes.GENRES: weight_genres,
-        Indexes.SUMMARIES: weight_summary
-    }
-    return search_engine.search(
-        query, method, weights, max_results=max_result_count, safe_ranking=True
-    )
+    # weights = ...  # TODO
+    # return search_engine.search(
+    #     query, method, weights, max_results=max_result_count, safe_ranking=True
+    # )
+    return None
 
 
 def get_movie_by_id(id: str, movies_dataset: List[Dict[str, str]]) -> Dict[str, str]:
@@ -102,22 +106,23 @@ def get_movie_by_id(id: str, movies_dataset: List[Dict[str, str]]) -> Dict[str, 
     dict
         The movie with the given id
     """
-    result, processed_result = movies_dataset.get(
-        id,
-        ({
-            "Title": "This is movie's title",
-            "Summary": "This is a summary",
-            "URL": "https://www.imdb.com/title/tt0111161/",
-            "Cast": ["Morgan Freeman", "Tim Robbins"],
-            "Genres": ["Drama", "Crime"],
-            "Image_URL": "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_.jpg",
-        }, None),
-    )
+    # result = movies_dataset.get(
+    #     id,
+    #     {
+    #         "Title": "This is movie's title",
+    #         "Summary": "This is a summary",
+    #         "URL": "https://www.imdb.com/title/tt0111161/",
+    #         "Cast": ["Morgan Freeman", "Tim Robbins"],
+    #         "Genres": ["Drama", "Crime"],
+    #         "Image_URL": "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_.jpg",
+    #     },
+    # )
 
-    result["Image_URL"] = (
-        result['Image_URL']
-    )
-    result["URL"] = (
-        f"https://www.imdb.com/title/{result['id']}"  # The url pattern of IMDb movies
-    )
-    return result, processed_result
+    # result["Image_URL"] = (
+    #     result['Image_URL']
+    # )
+    # result["URL"] = (
+    #     f"https://www.imdb.com/title/{result['id']}"  # The url pattern of IMDb movies
+    # )
+    # return result
+    return None
