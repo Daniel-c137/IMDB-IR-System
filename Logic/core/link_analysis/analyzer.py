@@ -1,3 +1,4 @@
+import numpy as np
 from .graph import LinkGraph
 from ..indexer.indexes_enum import Indexes
 from ..indexer.index_reader import Index_reader
@@ -30,8 +31,12 @@ class LinkAnalyzer:
         This function has no parameters. You can use self to get or change attributes
         """
         for movie in self.root_set:
-            #TODO
-            pass
+            m = self.graph.add_node(movie['id'])
+            self.hubs.append(m)
+            for star in movie['stars']:
+                s = self.graph.add_node(star)
+                self.authorities.append(s)
+                self.graph.add_edge(m, s)
 
     def expand_graph(self, corpus):
         """
@@ -50,8 +55,21 @@ class LinkAnalyzer:
         and refer to the nodes in the root set to the graph and to the list of hubs and authorities.
         """
         for movie in corpus:
-            #TODO
-            pass
+            for r in self.root_set:
+                for star in r['stars']:
+                    if star in movie['stars']:
+                        m = self.graph.add_node(movie['id'])
+                        self.graph.add_edge(m, star)
+                        self.hubs.append(m)
+                        break
+
+            for star in movie['stars']:
+                for r in self.root_set:
+                    if star in r['stars']:
+                        s = self.graph.add_edge(star)
+                        self.graph.add_edge(r['id'], s)
+                        self.authorities.append(m)
+                        break
 
     def hits(self, num_iteration=5, max_result=10):
         """
@@ -74,7 +92,17 @@ class LinkAnalyzer:
         a_s = []
         h_s = []
 
-        #TODO
+        for _ in range(num_iteration):
+            for i,a in enumerate(self.authorities):
+                self.authorities[i] = sum([self.authorities[j] if self.graph.get(i, j) == 1 else 0 for j in range(len(self.authorities))])
+                pass
+            for j,h in enumerate(self.hubs):
+                self.hubs[j] = sum([self.hubs[i] if self.graph.get(i, j) == 1 else 0 for i in range(len(self.hubs))])
+            self.authorities /= np.linalg.norm(self.authorities)
+            self.hubs /= np.linalg.norm(self.hubs)
+        
+        a_s = sorted(range(len(self.authorities)), key=lambda i: self.authorities[i], reverse=True)[:10]
+        h_s = sorted(range(len(self.hubs)), key=lambda i: self.hubs[i], reverse=True)[:10]
 
         return a_s, h_s
 
