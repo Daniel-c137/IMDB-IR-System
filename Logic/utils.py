@@ -47,7 +47,6 @@ def correct_text(text: str) -> str:
 
 def search(
     query: str,
-    query: str,
     max_result_count: int,
     method: str = "ltn-lnn",
     weights: list = [0.3, 0.3, 0.4],
@@ -119,7 +118,7 @@ def get_movie_by_id(id: str, movies_dataset: List[Dict[str, str]]) -> Dict[str, 
     # )
 
     # result["Image_URL"] = (
-    #     result['Image_URL']
+    #     "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_.jpg"  # a default picture for selected movies
     # )
     # result["URL"] = (
     #     f"https://www.imdb.com/title/{result['id']}"  # The url pattern of IMDb movies
