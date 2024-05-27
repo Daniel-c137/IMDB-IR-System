@@ -39,22 +39,25 @@ class FastTextDataLoader:
             data = json.load(f)
             pd.json_normalize(data)
             self.df = pd.json_normalize(data)
-            required_fields = ['synposis', 'summaries', 'reviews', 'title', 'genres']
+            required_fields = ['synposis', 'summaries', 'title', 'genres', 'reviews']
             labels_field = 'genres'
             for c in self.df.columns:
                 if c not in required_fields:
                     self.df = self.df.drop(c, axis=1)
             for f in required_fields:
-                if f != labels_field:
+                if f == labels_field:
+                    self.df[f] = self.df[f].apply(to_sorted_str)
+                else:
                     self.df[f] = self.df[f].apply(to_str)
             self.df = self.df.reset_index()
             nones = []
             for index, row in self.df.iterrows():
-                if row['summaries'] is None or len(row['summaries']) == 0:
+                if labels_field not in row.keys() or row[labels_field] is None or len(row[labels_field]) == 0:
                     nones.append(index)
             for index in nones:
                 self.df = self.df.drop(index)
-            self.df = self.df.explode(labels_field, ignore_index=True)
+            self.df['result'] = self.df[required_fields].agg(' '.join, axis=1)
+            # self.df = self.df.explode(labels_field, ignore_index=True)
 
 
     def create_train_data(self):
@@ -66,19 +69,23 @@ class FastTextDataLoader:
         """
         self.read_data_to_df()
         le = LabelEncoder()
-        x = self.df['summaries']
-        le.fit(self.df['genres'])
-        y = le.transform(self.df['genres'])
+        x = self.df['result']
+        y = le.fit_transform(self.df['genres'])
         return x, y
 
 def to_str(x):
     if x == None:
-        return x
+        return ''
     if len(x) == 0:
-        return x
+        return ''
     if isinstance(x, str):
         return x
     try:
         return ' '.join(x)
     except:
         return ' '.join(x[0])
+    
+def to_sorted_str(x):
+    if x is None or len(x) == 0:
+        return ''
+    return x[0]

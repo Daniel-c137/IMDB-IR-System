@@ -7,21 +7,23 @@ class LinkGraph:
     You can add or remove methods from it.
     """
     def __init__(self):
-        #TODO
-        pass
+        self.g = {}
 
     def add_edge(self, u_of_edge, v_of_edge):
-        #TODO
-        pass
+        if u_of_edge not in self.g.keys():
+            self.g[u_of_edge] = set()
+        if v_of_edge not in self.g.keys():
+            self.g[v_of_edge] = set()
+        self.g[u_of_edge].add(v_of_edge)
+        self.g[v_of_edge].add(u_of_edge)
 
     def add_node(self, node_to_add):
-        #TODO
-        pass
+        if node_to_add not in self.g.keys():
+            self.g[node_to_add] = set()
+        return node_to_add
 
     def get_successors(self, node):
-        #TODO
         pass
 
     def get_predecessors(self, node):
-        #TODO
         pass

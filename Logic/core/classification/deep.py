@@ -87,7 +87,30 @@ class DeepModelClassifier(BasicClassifier):
         -------
         self
         """
-        return self
+        dl = DataLoader(ReviewDataSet(x, y), batch_size=self.batch_size, shuffle=True)
+        max_f1 = 0
+        for epoch in tqdm(range(self.num_epochs)):
+            # Train
+            self.model.train()
+            l = 0
+            for x_batch, y_batch in dl:
+                x_batch, y_batch = x_batch.to(self.device), y_batch.to(self.device)
+                self.optimizer.zero_grad()
+                y_preds = self.model(x_batch)
+                loss = self.criterion(y_preds, y_batch)
+                loss.backward()
+                self.optimizer.step()
+                l += loss.item()
+            l /= len(dl)
+            # Evaluation
+            test_loss, _, _, f1_macro = self._eval_epoch(self.test_dataloader, self.model)
+            print(f"epoch {epoch + 1}/{self.num_epochs} | loss: {l:.4f} | test loss: {test_loss:.4f} | F1 score: {f1_macro:.4f}")
+
+
+            if f1_macro > max_f1:
+                max_f1 = f1_macro
+                self.best_model = self.model.state_dict()
+                torch.save(self.best_model,'deep.pt')
 
     def predict(self, x):
         """
@@ -101,7 +124,10 @@ class DeepModelClassifier(BasicClassifier):
         predicted_labels: list
             The predicted labels
         """
-        pass
+        test_dataset = ReviewDataSet(x, np.zeros(len(x)))  # Dummy labels
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+        preds, _, _ = self.predict_with_dl(test_loader, self.model)
+        return preds
 
     def _eval_epoch(self, dataloader: torch.utils.data.DataLoader, model):
         """
@@ -120,7 +146,24 @@ class DeepModelClassifier(BasicClassifier):
         f1_score_macro: float
             The f1 score on the given dataloader
         """
-        pass
+        preds, true_labels, loss = self.predict_with_dl(dataloader, model)
+        f1_macro = f1_score(true_labels, preds, average='macro')
+        return loss, preds, true_labels, f1_macro
+
+
+    def predict_with_dl(self, dataloader: torch.utils.data.DataLoader, model):
+        preds = []
+        true_labels = []
+        l = 0
+        model.eval()
+        with torch.no_grad():
+            for x, y in dataloader:
+                x, y = x.to(self.device), y.to(self.device)
+                y_preds = model(x)
+                l += self.criterion(y_preds, y).item()
+                preds.extend(torch.argmax(y_preds, dim=1).cpu().numpy())
+                true_labels.extend(y.cpu().numpy())
+        return preds, true_labels, l / len(dataloader)
 
     def set_test_dataloader(self, X_test, y_test):
         """
@@ -136,7 +179,8 @@ class DeepModelClassifier(BasicClassifier):
         self
             Returns self
         """
-        pass
+        test_dataset = ReviewDataSet(X_test, y_test)
+        self.test_dataloader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
 
     def prediction_report(self, x, y):
         """
@@ -152,11 +196,23 @@ class DeepModelClassifier(BasicClassifier):
         str
             The classification report
         """
-        pass
+        y_pred = self.predict(x)
+        return classification_report(y, y_pred)
 
 # F1 Accuracy : 79%
 if __name__ == '__main__':
     """
     Fit the model with the training data and predict the test data, then print the classification report
     """
-    pass
+    rl = ReviewLoader('IMDB Dataset.csv')
+    rl.load_data()
+    rl.get_embeddings()
+
+    X_train, X_test, y_train, y_test = rl.split_data(test_data_ratio=0.25)
+
+    classifier = DeepModelClassifier(in_features=100, num_classes=2, batch_size=32)
+    classifier.set_test_dataloader(X_test, y_test)
+
+    classifier.fit(X_train, y_train)
+    report = classifier.prediction_report(X_test, y_test)
+    print(report)

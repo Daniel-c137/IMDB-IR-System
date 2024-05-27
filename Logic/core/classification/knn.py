@@ -1,9 +1,9 @@
 import numpy as np
 from sklearn.metrics import classification_report
-from tqdm import tqdm
+from collections import Counter
 
-from .basic_classifier import BasicClassifier
-from .data_loader import ReviewLoader
+from basic_classifier import BasicClassifier
+from data_loader import ReviewLoader
 
 
 class KnnClassifier(BasicClassifier):
@@ -28,7 +28,8 @@ class KnnClassifier(BasicClassifier):
         self
             Returns self as a classifier
         """
-        pass
+        self.X = x
+        self.y = y
 
     def predict(self, x):
         """
@@ -42,7 +43,14 @@ class KnnClassifier(BasicClassifier):
             Return the predicted class for each doc
             with the highest probability (argmax)
         """
-        pass
+        y_pred = []
+        for i in range(x.shape[0]):
+            ds = np.linalg.norm(self.X - x[i, :], axis=1)
+            indices = np.argsort(ds)[:self.k]
+            labels = self.y[indices]
+            l = Counter(labels).most_common(1)[0][0]
+            y_pred.append(l)
+        return np.array(y_pred)
 
     def prediction_report(self, x, y):
         """
@@ -57,7 +65,8 @@ class KnnClassifier(BasicClassifier):
         str
             Return the classification report
         """
-        pass
+        y_pred = self.predict(x)
+        return classification_report(y, y_pred)
 
 
 # F1 Accuracy : 70%
@@ -65,4 +74,12 @@ if __name__ == '__main__':
     """
     Fit the model with the training data and predict the test data, then print the classification report
     """
-    pass
+    rl = ReviewLoader('IMDB Dataset.csv')
+    rl.load_data()
+    rl.get_embeddings()
+    X_train, X_test, y_train, y_test = rl.split_data(test_data_ratio=0.33)
+    
+    classifier = KnnClassifier(10)
+    classifier.fit(X_train, y_train)
+
+    print(classifier.prediction_report(X_test, y_test))

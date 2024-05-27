@@ -161,3 +161,5 @@ cython_debug/
 .idea/
 Logic/.DS_Store
 .DS_Store
+
+wandb/

@@ -62,7 +62,7 @@ class FastText:
         The trained FastText model.
     """
 
-    def __init__(self, preprocessor, method='skipgram'):
+    def __init__(self, preprocessor=preprocess_text, method='skipgram'):
         """
         Initializes the FastText with a preprocessor and a training method.
 
@@ -111,8 +111,7 @@ class FastText:
         """
         if do_preprocess:
             query = self.preprocess(query)
-        v = np.ndarray()
-        #TODO
+        return self.model.get_sentence_vector(query)
         
 
 
@@ -205,8 +204,8 @@ if __name__ == "__main__":
     X, Y = ft_data_loader.create_train_data()
 
     # ft_model.prepare(None, None, 'load')
-    ft_model.prepare(X, Y, 'train')
-    ft_model.prepare(None, None, None, save=True)
+    ft_model.prepare(X, 'train')
+    ft_model.prepare(None, None, save=True)
 
     print(10 * "*" + "Similarity" + 10 * "*")
     word = 'queen'
