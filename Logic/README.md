@@ -44,3 +44,14 @@ In the snippet module, extract a good summary from the document. To achieve this
 ## 8. [Utils](./utils.py)
 
 This file contains functions that is needed by UI to do some of the important functionalities. For now, you should complete the `clean_text` function that is used by UI to do the pre-processing operations that you implemented in `Preprocessor` class, on the input query by user.  You can **test** your implementation by running the UI, and giving different inputs and see that how is it being corrected (or actually, being cleaned! so it can be used better as we proceed in the project).
+
+
+# Phase 3
+## 1. BERT Fine-tuning
+Please refer to the specific [Readme file](./core/finetuner/README.md) and also docstrings and comments in python files (`.py`) for the explanation of the BERT fine-tuning part.
+
+## 2. RAG (Retrieval Augmented Generation)
+Please refer to the specific [Readme file](./core/rag/README.md) and also explanations which are provided in the **notebook**.
+
+## 3. Recommender Systems
+Please refer to the explanations provided inside [this notebook](./core/recommender_system/Recommender-system.ipynb). To download the datasets used in this part, please use [this google drive link](https://drive.google.com/drive/folders/17qLHdBAsypvYdaA9Gt8oUsHYrD3Wj9DR?usp=share_link).
