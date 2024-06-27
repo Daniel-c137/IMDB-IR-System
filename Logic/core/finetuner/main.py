@@ -1,5 +1,7 @@
+from BertFinetuner_mask import BERTFinetuner
+
 # Instantiate the class
-bert_finetuner = BERTFinetuner('path/to/your/file.json', top_n_genres=5)
+bert_finetuner = BERTFinetuner('IMDB_crawled_give.json')
 
 # Load the dataset
 bert_finetuner.load_dataset()
